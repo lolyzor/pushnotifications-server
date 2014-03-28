@@ -11,6 +11,7 @@ import urllib2
 from flask.wrappers import Response
 
 app = Flask(__name__)
+app.debug = True
 # Note: We don't need to call run() since our application is embedded within
 # the App Engine WSGI application server.
 
@@ -41,10 +42,11 @@ def sendmessage2():
     f = urllib2.urlopen(req)
     responseMsg = f.read()
     f.close()
-    #return responseMsg;
-    #return json.dumps(dataToSend, sort_keys=True, indent=4)
-    #return redirect(url_for('/'))
-    return render_template('sendmessage.html',sent=True)
+
+    if request.method == 'POST':
+        return render_template('sendmessage.html',sent=True)
+    if request.method == 'GET':
+        return responseMsg
 
 @app.route('/sendmessage',methods=['POST','GET'])
 def sendmessage():
@@ -77,14 +79,17 @@ def sendmessage():
 def newphone():
     if request.method == 'POST':
         json_obj = request.get_json(force=True)
-        phone = Phone(phone_id = json_obj['id'],android_version = json_obj['android_version'])
-        allphones = Phone.all()
-        exists = False
+        phone = Phone(key_name=json_obj['id'],phone_id = json_obj['id'],android_version = json_obj['android_version'])
+        phone.put()
+        """
         for thisPhone in allphones:
             if phone.phone_id == thisPhone.phone_id:
                 exists = True
         if not exists:
-            phone.put()
+            if not phone.is_saved():
+                phone.put()
+        """
+        return 'db id is '
     if request.method == 'GET':
         dbphones = Phone.all()
         return render_template('phones.html',phones=dbphones)
