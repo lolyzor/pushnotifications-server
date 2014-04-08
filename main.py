@@ -2,16 +2,26 @@
 
 # Import the Flask Framework
 import json
+import os
+import hashlib
+import urllib2
+import random
+import logging
 from flask import Flask
 from flask import render_template
 from flask import request
-from models import Phone
-from werkzeug.datastructures import MultiDict
-import urllib2
+from flask import jsonify
 from flask.wrappers import Response
+from werkzeug.datastructures import MultiDict
+from werkzeug.utils import secure_filename
+from models import Phone
+from models import Post
+from models import Image
 
 app = Flask(__name__)
 app.debug = True
+app.config['UPLOAD_FOLDER'] = 'uploads/'
+
 # Note: We don't need to call run() since our application is embedded within
 # the App Engine WSGI application server.
 
@@ -50,10 +60,9 @@ def sendmessage2():
 
 @app.route('/sendmessage',methods=['POST','GET'])
 def sendmessage():
+    """
     phones = Phone.all()
     regIds = [phone.phone_id for phone in phones]
-    #data = [{'title':'me'},{'post':'123'}]
-    #dataToSend = [{'registration_ids':regIds},:data]
     data = dict()
     data['title'] = 'me'
     data['post'] = '123'
@@ -74,6 +83,35 @@ def sendmessage():
     f.close()
     return responseMsg;
     return json.dumps(dataToSend, sort_keys=True, indent=4)
+    """
+    data = MultiDict()
+    f = request.form
+    for key in f.keys():
+        data[key] = f[key]
+
+    files = request.files.getlist('upload')
+
+    titleMsgHash = data['title'] + data['post']# + chr(random.randrange(97,97+26+1))
+    titleMsgHash = getHash(titleMsgHash)
+
+    currentPost = Post(key_name=titleMsgHash,title=data['title'],msg=data['post'])
+    currentPost.put()
+    base64Strings = []
+    i = 0
+    for file in files:
+        #file.save(os.path.join(app.config['UPLOAD_FOLDER'], file.filename))
+        fileString = file.read()
+        image64String = fileString.encode("base64")
+        imageKeyName = data['title']+data['post']+'image'+str(i)
+        tmpImage = Image(key_name=getHash(imageKeyName),encoded_string=image64String,post_id=currentPost.key())
+        tmpImage.put()
+        i = i+1
+
+    logging.debug('reached end')
+    return jsonify(data)
+
+def getHash(text):
+    return hashlib.md5(text).hexdigest()[:10]
 
 @app.route('/newphone',methods=['POST','GET'])
 def newphone():
