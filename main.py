@@ -11,16 +11,21 @@ from flask import Flask
 from flask import render_template
 from flask import request
 from flask import jsonify
+#from flask_debugtoolbar import DebugToolbarExtension
 from flask.wrappers import Response
 from werkzeug.datastructures import MultiDict
 from werkzeug.utils import secure_filename
 from models import Phone
 from models import Post
 from models import Image
+from google.appengine.api.datastore import Key
 
 app = Flask(__name__)
 app.debug = True
 app.config['UPLOAD_FOLDER'] = 'uploads/'
+app.config['SECRET_KEY'] = '123abcde'
+
+#toolbar = DebugToolbarExtension(app)
 
 # Note: We don't need to call run() since our application is embedded within
 # the App Engine WSGI application server.
@@ -112,6 +117,26 @@ def sendmessage():
 
 def getHash(text):
     return hashlib.md5(text).hexdigest()[:10]
+
+@app.route('/posts/<postkey>')
+def posts(postkey):
+    p = Post.all()
+    if postkey != 'all':
+        key = Key(postkey)
+        p.filter("__key__ =",key)
+    postList = ['defualtfirst']
+    for post in p.run():
+        tmpPost = MultiDict()
+        tmpPost['title'] = post.title
+        tmpPost['msg'] = post.msg
+        q = Image.all()
+        q.filter("post_id",post.key())
+        for i,image in enumerate(q.run()):
+            tmpPost['image'+str(i)] = image.encoded_string
+        postList.append(tmpPost)
+    tmpOutput = MultiDict()
+    tmpOutput['res'] = postList
+    return jsonify(tmpOutput)
 
 @app.route('/newphone',methods=['POST','GET'])
 def newphone():
